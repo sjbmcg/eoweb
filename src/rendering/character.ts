@@ -8,6 +8,7 @@ export enum CharacterState {
   Standing = 0,
   Walking = 1,
   SitGround = 2,
+  Attacking = 3,
 }
 
 const CHARACTER_WIDTH = 18;
@@ -16,11 +17,16 @@ const CHARACTER_WALKING_WIDTH = 26;
 const HALF_CHARACTER_WALKING_WIDTH = CHARACTER_WALKING_WIDTH / 2;
 const CHARACTER_SIT_GROUND_WIDTH = 24;
 const HALF_CHARACTER_SIT_GROUND_WIDTH = CHARACTER_SIT_GROUND_WIDTH / 2;
+const CHARACTER_ATTACK_WIDTH = 24;
+const HALF_CHARACTER_ATTACK_WIDTH = CHARACTER_ATTACK_WIDTH / 2;
+
 const CHARACTER_HEIGHT = 58;
 const CHARACTER_WALKING_HEIGHT = 61;
 const CHARACTER_SIT_GROUND_HEIGHT = 43;
+const CHARACTER_ATTACK_HEIGHT = 58;
 
 const WALK_ANIMATION_FRAMES = 4;
+const ATTACK_ANIMATION_FRAMES = 2;
 
 export class CharacterRenderer {
   mapInfo: CharacterMapInfo;
@@ -40,6 +46,7 @@ export class CharacterRenderer {
   preloadSprites() {
     getBitmapById(GfxType.SkinSprites, 1); // standing
     getBitmapById(GfxType.SkinSprites, 2); // walking
+    getBitmapById(GfxType.SkinSprites, 3); // attacking
     getBitmapById(GfxType.SkinSprites, 6); // sitting on ground
   }
 
@@ -49,9 +56,17 @@ export class CharacterRenderer {
     this.walkOffset = { x: 0, y: 0 };
   }
 
-  tick() {
-    if (this.state === CharacterState.Walking) {
-      this.animationFrame = (this.animationFrame + 1) % WALK_ANIMATION_FRAMES;
+ tick() {
+    if (
+      this.state === CharacterState.Walking ||
+      this.state === CharacterState.Attacking
+    ) {
+      // use same tick rate for walking and attacking
+      const frames =
+        this.state === CharacterState.Walking
+          ? WALK_ANIMATION_FRAMES
+          : ATTACK_ANIMATION_FRAMES;
+      this.animationFrame = (this.animationFrame + 1) % frames;
     }
   }
 
@@ -66,8 +81,98 @@ export class CharacterRenderer {
       case CharacterState.SitGround:
         this.renderSittingOnGround(ctx, playerScreen);
         break;
+      case CharacterState.Attacking:
+        this.renderAttacking(ctx, playerScreen);
+        break;
     }
   }
+
+    renderAttacking(ctx: CanvasRenderingContext2D, playerScreen: Vector2) {
+    const bmp = getBitmapById(GfxType.SkinSprites, 3); // Attack sprite sheet
+    if (!bmp) {
+      return;
+    }
+
+    // Attack sprite sheet layout: Female frames 0-3, Male frames 4-7
+    const startX =
+      this.mapInfo.gender === Gender.Female ? 0 : CHARACTER_ATTACK_WIDTH * 4;
+
+    // Direction offset: Down/Right = 0, Up/Left = 2 frames ahead
+    const directionOffset = [Direction.Up, Direction.Left].includes(
+      this.mapInfo.direction,
+    )
+      ? CHARACTER_ATTACK_WIDTH * ATTACK_ANIMATION_FRAMES
+      : 0;
+
+    const sourceX =
+      startX + directionOffset + CHARACTER_ATTACK_WIDTH * this.animationFrame;
+    const sourceY = this.mapInfo.skin * CHARACTER_ATTACK_HEIGHT;
+
+    const screenCoords = isoToScreen(this.mapInfo.coords);
+
+    // Attack sprites may need different positioning offsets
+    const additionalOffset = { x: 0, y: 0 };
+    switch (this.mapInfo.direction) {
+      case Direction.Up:
+        additionalOffset.x = 0;
+        break;
+      case Direction.Down:
+        additionalOffset.x = -2;
+        break;
+      case Direction.Left:
+        additionalOffset.x = -4;
+        break;
+      case Direction.Right:
+        additionalOffset.x = 4;
+        break;
+    }
+
+    const screenX =
+      screenCoords.x -
+      HALF_CHARACTER_ATTACK_WIDTH -
+      playerScreen.x +
+      HALF_GAME_WIDTH +
+      additionalOffset.x;
+
+    const screenY =
+      screenCoords.y -
+      CHARACTER_ATTACK_HEIGHT -
+      playerScreen.y +
+      HALF_GAME_HEIGHT +
+      4 +
+      additionalOffset.y;
+
+    const mirrored = [Direction.Right, Direction.Up].includes(
+      this.mapInfo.direction,
+    );
+
+    if (mirrored) {
+      ctx.save();
+      ctx.translate(GAME_WIDTH, 0);
+      ctx.scale(-1, 1);
+    }
+
+    const drawX = mirrored
+      ? GAME_WIDTH - screenX - CHARACTER_ATTACK_WIDTH
+      : screenX;
+
+    ctx.drawImage(
+      bmp,
+      sourceX,
+      sourceY,
+      CHARACTER_ATTACK_WIDTH,
+      CHARACTER_ATTACK_HEIGHT,
+      drawX,
+      screenY,
+      CHARACTER_ATTACK_WIDTH,
+      CHARACTER_ATTACK_HEIGHT,
+    );
+
+    if (mirrored) {
+      ctx.restore();
+    }
+  }
+
 
   renderStanding(ctx: CanvasRenderingContext2D, playerScreen: Vector2) {
     const bmp = getBitmapById(GfxType.SkinSprites, 1);
@@ -97,9 +202,9 @@ export class CharacterRenderer {
     );
 
     if (mirrored) {
-      ctx.save(); // Save the current context state
-      ctx.translate(GAME_WIDTH, 0); // Move origin to the right edge
-      ctx.scale(-1, 1); // Flip horizontally
+      ctx.save();
+      ctx.translate(GAME_WIDTH, 0);
+      ctx.scale(-1, 1);
     }
 
     const drawX = mirrored ? GAME_WIDTH - screenX - CHARACTER_WIDTH : screenX;
@@ -179,9 +284,9 @@ export class CharacterRenderer {
     );
 
     if (mirrored) {
-      ctx.save(); // Save the current context state
-      ctx.translate(GAME_WIDTH, 0); // Move origin to the right edge
-      ctx.scale(-1, 1); // Flip horizontally
+      ctx.save();
+      ctx.translate(GAME_WIDTH, 0);
+      ctx.scale(-1, 1);
     }
 
     const drawX = mirrored
@@ -286,9 +391,9 @@ export class CharacterRenderer {
     );
 
     if (mirrored) {
-      ctx.save(); // Save the current context state
-      ctx.translate(GAME_WIDTH, 0); // Move origin to the right edge
-      ctx.scale(-1, 1); // Flip horizontally
+      ctx.save();
+      ctx.translate(GAME_WIDTH, 0);
+      ctx.scale(-1, 1);
     }
 
     const drawX = mirrored

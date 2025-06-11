@@ -6,6 +6,7 @@ export enum Input {
   Left = 2,
   Right = 3,
   SitStand = 4,
+  Attack = 5,
   Unknown = -1,
 }
 
@@ -52,6 +53,10 @@ function swipedDir(dx: number, dy: number): Input {
       : Input.Right;
 }
 
+// Track double-tap for touch attack
+let lastTapTime = 0;
+const DOUBLE_TAP_DELAY = 300;
+
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && ['=', '+', '-', '_'].includes(e.key)) {
     e.preventDefault();
@@ -74,6 +79,10 @@ window.addEventListener('keydown', (e) => {
     case 'x':
       updateInputHeld(Input.SitStand, true);
       break;
+    case ' ':
+    case 'z':
+      updateInputHeld(Input.Attack, true);
+      break;
   }
 });
 
@@ -94,17 +103,34 @@ window.addEventListener('keyup', (e) => {
     case 'x':
       updateInputHeld(Input.SitStand, false);
       break;
+    case ' ':
+    case 'z':
+      updateInputHeld(Input.Attack, false);
+      break;
   }
 });
 
 window.addEventListener(
   'touchstart',
   (e) => {
+    const currentTime = Date.now();
+    const tapLength = currentTime - lastTapTime;
+    
+    // Check for double tap (attack)
+    if (tapLength < DOUBLE_TAP_DELAY && tapLength > 0) {
+      updateInputHeld(Input.Attack, true);
+      e.preventDefault();
+      lastTapTime = currentTime;
+      return;
+    }
+    
     const t = e.changedTouches[0];
     touchStartX = t.clientX;
     touchStartY = t.clientY;
     touchId = t.identifier;
     activeTouchDir = null;
+    
+    lastTapTime = currentTime;
   },
   { passive: false },
 );
@@ -149,6 +175,11 @@ window.addEventListener(
     if (activeTouchDir !== null) {
       updateDirectionHeld(activeTouchDir, false);
     }
+
+    // Release attack after short delay
+    setTimeout(() => {
+      updateInputHeld(Input.Attack, false);
+    }, 50);
 
     touchStartX = touchStartY = null;
     touchId = null;

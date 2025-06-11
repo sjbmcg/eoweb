@@ -6,6 +6,7 @@ import { type CharacterRenderer, CharacterState } from './rendering/character';
 const WALK_TICKS = 4;
 const FACE_TICKS = 1;
 const SIT_TICKS = 4;
+const ATTACK_TICKS = 2;
 const WALK_WIDTH_FACTOR = HALF_TILE_WIDTH / 4;
 const WALK_HEIGHT_FACTOR = HALF_TILE_HEIGHT / 4;
 
@@ -29,6 +30,7 @@ export class MovementController {
   walkTicks = WALK_TICKS;
   faceTicks = FACE_TICKS;
   sitTicks = SIT_TICKS;
+  attackTicks = ATTACK_TICKS;
 
   constructor(character: CharacterRenderer) {
     this.character = character;
@@ -41,10 +43,34 @@ export class MovementController {
 
   tick() {
     this.faceTicks = Math.max(this.faceTicks - 1, 0);
+    this.attackTicks = Math.max(this.attackTicks - 1, 0);
 
     const latestInput = getLatestDirectionHeld();
     const directionHeld =
       latestInput !== null ? inputToDirection(latestInput) : null;
+
+    // Handle attack input - can attack from standing or sitting
+    if (
+      this.attackTicks === 0 && 
+      isInputHeld(Input.Attack) && 
+      this.character.state !== CharacterState.Walking &&
+      this.character.state !== CharacterState.Attacking
+    ) {
+      this.character.setState(CharacterState.Attacking);
+      this.attackTicks = ATTACK_TICKS;
+      return;
+    }
+
+    // Return from attack to standing when attack finishes
+    if (this.character.state === CharacterState.Attacking && this.attackTicks === 0) {
+      this.character.setState(CharacterState.Standing);
+      return;
+    }
+
+    // Don't process movement while attacking
+    if (this.character.state === CharacterState.Attacking) {
+      return;
+    }
 
     if (
       this.character.state === CharacterState.Standing &&
@@ -141,7 +167,7 @@ export class MovementController {
     if (this.sitTicks === 0 && isInputHeld(Input.SitStand)) {
       if (this.character.state === CharacterState.Standing) {
         this.character.setState(CharacterState.SitGround);
-      } else {
+      } else if (this.character.state === CharacterState.SitGround) {
         this.character.setState(CharacterState.Standing);
       }
       this.sitTicks = SIT_TICKS;
